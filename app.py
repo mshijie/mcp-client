@@ -84,6 +84,10 @@ with st.sidebar:
                 st.rerun()
         else:
             if st.button("📄 Document", width="stretch"):
+                # Backup all param widget values before switching
+                st.session_state["_param_backup"] = {
+                    k: v for k, v in st.session_state.items() if k.startswith("param_")
+                }
                 st.session_state.view_mode = "document"
                 st.rerun()
 
@@ -175,20 +179,24 @@ if st.session_state.view_mode == "document":
         if desc:
             st.markdown(desc)
 
-        if props:
-            rows = []
-            for pname, prop in props.items():
-                rows.append({
-                    "Name": pname,
-                    "Type": prop.get("type", "string"),
-                    "Required": "Yes" if pname in req_fields else "No",
-                    "Default": str(prop["default"]) if "default" in prop else "—",
-                    "Description": prop.get("description", "—"),
-                })
-            df = pd.DataFrame(rows)
-            st.dataframe(df, width="stretch", hide_index=True, height=(len(rows) + 1) * 35 + 3)
-        else:
-            st.caption("This tool takes no parameters.")
+        tab_params, tab_json = st.tabs(["Parameters", "Tool Definition"])
+        with tab_params:
+            if props:
+                rows = []
+                for pname, prop in props.items():
+                    rows.append({
+                        "Name": pname,
+                        "Type": prop.get("type", "string"),
+                        "Required": "Yes" if pname in req_fields else "No",
+                        "Default": str(prop["default"]) if "default" in prop else "—",
+                        "Description": prop.get("description", "—"),
+                    })
+                df = pd.DataFrame(rows)
+                st.dataframe(df, width="stretch", hide_index=True, height=(len(rows) + 1) * 35 + 3)
+            else:
+                st.caption("This tool takes no parameters.")
+        with tab_json:
+            st.json(t)
 
         if idx < len(all_tools) - 1:
             st.divider()
@@ -223,6 +231,12 @@ properties = input_schema.get("properties", {})
 required_fields = set(input_schema.get("required", []))
 
 with tab_tool:
+    _backup = st.session_state.get("_param_backup", {})
+
+    def _bk(key, default):
+        """Return backup value if available, otherwise the schema default."""
+        return _backup[key] if key in _backup else default
+
     if properties:
         # Header: Name | Value | Description
         header_cols = st.columns([2, 2, 5])
@@ -263,6 +277,8 @@ with tab_tool:
                     dv_a, dv_b = "", ""
                     if isinstance(default, list) and len(default) == 2:
                         dv_a, dv_b = str(default[0]), str(default[1])
+                    dv_a = _bk(f"{widget_key}_a", dv_a)
+                    dv_b = _bk(f"{widget_key}_b", dv_b)
                     pair_cols = st.columns([1, 0.2, 1])
                     val_a = pair_cols[0].text_input(label_a, value=dv_a, key=f"{widget_key}_a", placeholder=label_a, label_visibility="collapsed")
                     pair_cols[1].markdown("<div style='text-align:center;padding-top:8px'>-</div>", unsafe_allow_html=True)
@@ -285,13 +301,18 @@ with tab_tool:
                     else:
                         options = [""] + [str(v) for v in enum_values]
                         idx = options.index(str(default)) if default is not None and str(default) in options else 0
+                    bk_val = _backup.get(widget_key)
+                    if bk_val is not None and bk_val in options:
+                        idx = options.index(bk_val)
                     val = st.selectbox(pname, options=options, index=idx, key=widget_key, label_visibility="collapsed")
                     if val:
                         params[pname] = val
                 elif prop_type == "boolean":
-                    params[pname] = st.checkbox(pname, value=bool(default) if default is not None else False, key=widget_key, label_visibility="collapsed")
+                    bk_bool = _bk(widget_key, bool(default) if default is not None else False)
+                    params[pname] = st.checkbox(pname, value=bk_bool, key=widget_key, label_visibility="collapsed")
                 elif prop_type in ("integer", "number"):
-                    val = st.text_input(pname, value=str(default) if default is not None else "", key=widget_key, label_visibility="collapsed")
+                    bk_str = _bk(widget_key, str(default) if default is not None else "")
+                    val = st.text_input(pname, value=bk_str, key=widget_key, label_visibility="collapsed")
                     if val.strip():
                         try:
                             params[pname] = int(val) if prop_type == "integer" else float(val)
@@ -300,14 +321,16 @@ with tab_tool:
                 elif prop_type in ("object", "array"):
                     ph = '{"key":"value"}' if prop_type == "object" else "[1,2,3]"
                     dv = json.dumps(default, ensure_ascii=False) if default is not None else ""
-                    val = st.text_area(pname, value=dv, placeholder=ph, key=widget_key, height=68, label_visibility="collapsed")
+                    bk_str = _bk(widget_key, dv)
+                    val = st.text_area(pname, value=bk_str, placeholder=ph, key=widget_key, height=68, label_visibility="collapsed")
                     if val.strip():
                         try:
                             params[pname] = json.loads(val)
                         except json.JSONDecodeError:
                             st.warning("Invalid JSON")
                 else:
-                    val = st.text_input(pname, value=str(default) if default is not None else "", key=widget_key, label_visibility="collapsed")
+                    bk_str = _bk(widget_key, str(default) if default is not None else "")
+                    val = st.text_input(pname, value=bk_str, key=widget_key, label_visibility="collapsed")
                     if val:
                         params[pname] = val
     else:
