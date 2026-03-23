@@ -52,7 +52,7 @@ with st.sidebar:
         st.caption(f"URL: `{srv_cfg['url'][:60]}...`" if len(srv_cfg.get("url", "")) > 60 else f"URL: `{srv_cfg.get('url', '')}`")
 
     # --- Connect ---
-    if st.button("Connect", use_container_width=True):
+    if st.button("Connect", width="stretch"):
         st.session_state.connect_error = None
         st.session_state.call_result = None
         st.session_state.selected_tool = None
@@ -79,11 +79,11 @@ with st.sidebar:
 
         # Document view toggle
         if st.session_state.view_mode == "document":
-            if st.button("Back to Tester", use_container_width=True):
+            if st.button("Back to Tester", width="stretch"):
                 st.session_state.view_mode = "tool_tester"
                 st.rerun()
         else:
-            if st.button("📄 Document", use_container_width=True):
+            if st.button("📄 Document", width="stretch"):
                 st.session_state.view_mode = "document"
                 st.rerun()
 
@@ -126,7 +126,7 @@ with st.sidebar:
                     name = t["name"]
                     is_active = name == st.session_state.selected_tool
                     label = f"▸ {name}" if is_active else f"  {name}"
-                    if st.button(label, key=f"tool_btn_{name}", use_container_width=True,
+                    if st.button(label, key=f"tool_btn_{name}", width="stretch",
                                  type="primary" if is_active else "secondary"):
                         st.session_state.selected_tool = name
                         st.session_state.call_result = None
@@ -186,7 +186,7 @@ if st.session_state.view_mode == "document":
                     "Description": prop.get("description", "—"),
                 })
             df = pd.DataFrame(rows)
-            st.dataframe(df, use_container_width=True, hide_index=True, height=(len(rows) + 1) * 35 + 3)
+            st.dataframe(df, width="stretch", hide_index=True, height=(len(rows) + 1) * 35 + 3)
         else:
             st.caption("This tool takes no parameters.")
 
@@ -322,7 +322,7 @@ with tab_tool:
     # --- Call tool ---
     col1, col2 = st.columns([1, 4])
     with col1:
-        call_clicked = st.button("Call Tool", type="primary", use_container_width=True)
+        call_clicked = st.button("Call Tool", type="primary", width="stretch")
     with col2:
         if missing:
             st.warning(f"Missing required: {', '.join(missing)}")
@@ -420,7 +420,7 @@ if st.session_state.call_result is not None:
                                 sample = df[col].dropna().astype(str).head(5)
                                 if sample.str.match(r"https?://.+\.(jpg|jpeg|png|gif|webp|svg)", case=False).all() and len(sample) > 0:
                                     img_cols[col] = st.column_config.ImageColumn(col, width=65)
-                            st.dataframe(df, column_config=img_cols, use_container_width=True, height=900, row_height=50)
+                            st.dataframe(df, column_config=img_cols, width="stretch", height=900, row_height=50)
                         else:
                             st.json(parsed)
                         if suffix:
