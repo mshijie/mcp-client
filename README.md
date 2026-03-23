@@ -54,9 +54,3 @@ Stdio transport is also supported:
   }
 }
 ```
-
-## Screenshot
-
-1. Select a server and click **Connect**
-2. Browse tools in the sidebar
-3. Switch to **Document** view for a full API reference
