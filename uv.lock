@@ -391,7 +391,7 @@ wheels = [
 [[package]]
 name = "mcp-client"
 version = "0.2.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "reflex" },
     { name = "requests" },

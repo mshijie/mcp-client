@@ -8,3 +8,10 @@ dependencies = [
     "reflex>=0.7.0",
     "requests>=2.31.0",
 ]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

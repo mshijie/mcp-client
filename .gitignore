@@ -23,4 +23,5 @@ wheels/
 # Reflex
 .web/
 .agents/
+.claude/
 .playwright-mcp
