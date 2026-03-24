@@ -23,6 +23,7 @@ class ToolTesterState(ConnectionState):
     tab_errors: dict[str, str] = {}
     tab_params: dict[str, dict] = {}
     tab_calling: dict[str, bool] = {}
+    tab_form_data: dict[str, dict[str, str]] = {}  # form field values per tab
 
     # Table sorting (shared, resets on tab switch)
     sort_column: str = ""
@@ -60,10 +61,57 @@ class ToolTesterState(ConnectionState):
     # --- Event handlers ---
 
     @rx.event
+    def set_field_value(self, field_key: str, value: str):
+        """Save a form field value for the active tab."""
+        if not self.active_tab:
+            return
+        if self.active_tab not in self.tab_form_data:
+            self.tab_form_data[self.active_tab] = {}
+        self.tab_form_data[self.active_tab][field_key] = value
+
+    @rx.event
+    def set_field_bool(self, field_key: str, value: bool):
+        """Save a boolean form field value for the active tab."""
+        if not self.active_tab:
+            return
+        if self.active_tab not in self.tab_form_data:
+            self.tab_form_data[self.active_tab] = {}
+        self.tab_form_data[self.active_tab][field_key] = "true" if value else "false"
+
+    def _init_form_data(self, tool_name: str):
+        """Pre-populate form data with defaults for a new tab."""
+        tools = self.tools_by_server.get(self.selected_server, [])
+        tool = None
+        for t in tools:
+            if t["name"] == tool_name:
+                tool = t
+                break
+        if not tool:
+            self.tab_form_data[tool_name] = {}
+            return
+        schema = tool.get("inputSchema", {})
+        props = schema.get("properties", {})
+        required = set(schema.get("required", []))
+        data: dict[str, str] = {}
+        for pname, prop in props.items():
+            prop_type = prop.get("type", "string")
+            enum_values = prop.get("enum")
+            default = prop.get("default")
+            if default is None and enum_values and pname in required:
+                default = enum_values[0]
+            if default is not None:
+                if prop_type in ("object", "array"):
+                    data[f"param_{pname}"] = json.dumps(default, ensure_ascii=False)
+                else:
+                    data[f"param_{pname}"] = str(default)
+        self.tab_form_data[tool_name] = data
+
+    @rx.event
     def select_tool(self, name: str):
         """Open a tool tab (or switch to it if already open)."""
         if name not in self.open_tabs:
             self.open_tabs = self.open_tabs + [name]
+            self._init_form_data(name)
         self.active_tab = name
         self.sort_column = ""
         self.sort_ascending = True
@@ -79,6 +127,7 @@ class ToolTesterState(ConnectionState):
         self.tab_errors.pop(name, None)
         self.tab_params.pop(name, None)
         self.tab_calling.pop(name, None)
+        self.tab_form_data.pop(name, None)
         # Switch to nearest neighbor if closing the active tab
         if self.active_tab == name:
             if self.open_tabs:
@@ -143,6 +192,7 @@ class ToolTesterState(ConnectionState):
         schema = tool.get("inputSchema", {})
         props = schema.get("properties", {})
         required = set(schema.get("required", []))
+        form_data = self.tab_form_data.get(self.active_tab, {})
         result = []
         for name, prop in props.items():
             prop_type = prop.get("type", "string")
@@ -191,6 +241,11 @@ class ToolTesterState(ConnectionState):
                 "form_key": f"param_{name}",
                 "form_key_a": f"param_{name}_a",
                 "form_key_b": f"param_{name}_b",
+                # Saved form values (falls back to defaults)
+                "value": form_data.get(f"param_{name}", default_str),
+                "value_a": form_data.get(f"param_{name}_a", ""),
+                "value_b": form_data.get(f"param_{name}_b", ""),
+                "value_bool": form_data.get(f"param_{name}", "false").lower() in ("true", "on", "1") if prop_type == "boolean" else (bool(default) if prop_type == "boolean" else False),
             })
         return result
 

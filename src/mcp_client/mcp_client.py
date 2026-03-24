@@ -51,7 +51,7 @@ def index() -> rx.Component:
     return rx.hstack(
         sidebar(),
         rx.vstack(
-            tab_bar(),
+            rx.cond(ViewState.is_tester_mode, tab_bar()),
             rx.box(
                 main_content(),
                 flex="1",

@@ -11,7 +11,8 @@ def _pair_input(prop: rx.Var[dict]) -> rx.Component:
         rx.input(
             name=prop["form_key_a"].to(str),
             placeholder=prop["pair_label_a"].to(str),
-            default_value=prop["default"].to(str),
+            default_value=prop["value_a"].to(str),
+            on_change=ToolTesterState.set_field_value(prop["form_key_a"].to(str)),
             size="2",
             width="45%",
         ),
@@ -19,6 +20,8 @@ def _pair_input(prop: rx.Var[dict]) -> rx.Component:
         rx.input(
             name=prop["form_key_b"].to(str),
             placeholder=prop["pair_label_b"].to(str),
+            default_value=prop["value_b"].to(str),
+            on_change=ToolTesterState.set_field_value(prop["form_key_b"].to(str)),
             size="2",
             width="45%",
         ),
@@ -31,7 +34,8 @@ def _enum_input(prop: rx.Var[dict]) -> rx.Component:
     return rx.select(
         prop["enum_values"].to(list[str]),
         name=prop["form_key"].to(str),
-        default_value=prop["default"].to(str),
+        default_value=prop["value"].to(str),
+        on_change=ToolTesterState.set_field_value(prop["form_key"].to(str)),
         width="100%",
         size="2",
     )
@@ -40,32 +44,29 @@ def _enum_input(prop: rx.Var[dict]) -> rx.Component:
 def _boolean_input(prop: rx.Var[dict]) -> rx.Component:
     return rx.checkbox(
         name=prop["form_key"].to(str),
-        default_checked=prop["default_bool"].to(bool),
+        default_checked=prop["value_bool"].to(bool),
+        on_change=ToolTesterState.set_field_bool(prop["form_key"].to(str)),
     )
 
 
 def _textarea_input(prop: rx.Var[dict]) -> rx.Component:
-    return rx.el.textarea(
+    return rx.text_area(
         name=prop["form_key"].to(str),
         placeholder=prop["placeholder"].to(str),
-        default_value=prop["default"].to(str),
-        rows=3,
-        style={
-            "width": "100%",
-            "padding": "6px 8px",
-            "border": "1px solid var(--gray-a7)",
-            "border_radius": "var(--radius-2)",
-            "font_size": "14px",
-            "font_family": "inherit",
-            "resize": "vertical",
-        },
+        default_value=prop["value"].to(str),
+        on_change=ToolTesterState.set_field_value(prop["form_key"].to(str)),
+        rows="3",
+        width="100%",
+        size="2",
+        resize="vertical",
     )
 
 
 def _text_input(prop: rx.Var[dict]) -> rx.Component:
     return rx.input(
         name=prop["form_key"].to(str),
-        default_value=prop["default"].to(str),
+        default_value=prop["value"].to(str),
+        on_change=ToolTesterState.set_field_value(prop["form_key"].to(str)),
         width="100%",
         size="2",
     )
