@@ -183,5 +183,6 @@ def sidebar() -> rx.Component:
         min_width="280px",
         height="100vh",
         overflow_y="auto",
+        overscroll_behavior="none",
         border_right="1px solid var(--gray-a5)",
     )

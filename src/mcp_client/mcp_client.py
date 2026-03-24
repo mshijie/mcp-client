@@ -53,6 +53,7 @@ def index() -> rx.Component:
             flex="1",
             padding="24px",
             overflow_y="auto",
+            overscroll_behavior="none",
             height="100vh",
         ),
         width="100%",
