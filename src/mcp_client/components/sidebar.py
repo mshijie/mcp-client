@@ -15,7 +15,6 @@ _TOOL_LINK_STYLE = {
     "text_decoration": "none",
     "color": "var(--accent-a11)",
     "cursor": "pointer",
-    "&:hover": {"background": "var(--gray-a3)"},
 }
 
 
