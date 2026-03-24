@@ -7,35 +7,42 @@ from mcp_client.state.tool_tester import ToolTesterState
 from mcp_client.state.view import ViewState
 
 
+_TOOL_LINK_STYLE = {
+    "display": "block",
+    "padding": "4px 8px",
+    "border_radius": "var(--radius-2)",
+    "font_size": "14px",
+    "text_decoration": "none",
+    "color": "var(--accent-a11)",
+    "cursor": "pointer",
+    "&:hover": {"background": "var(--gray-a3)"},
+}
+
+_TOOL_LINK_ACTIVE_STYLE = {
+    **_TOOL_LINK_STYLE,
+    "background": "var(--accent-9)",
+    "color": "white",
+    "&:hover": {"background": "var(--accent-10)"},
+}
+
+
 def _tool_item(name: rx.Var[str]) -> rx.Component:
-    """A single tool item — button in tester mode, anchor link in document mode."""
+    """A single tool item — consistent link style for both modes."""
     return rx.cond(
         ViewState.is_document_mode,
         rx.el.a(
             name,
             href="#" + name,
-            style={
-                "display": "block",
-                "padding": "4px 8px",
-                "border_radius": "var(--radius-2)",
-                "font_size": "14px",
-                "text_decoration": "none",
-                "color": "var(--accent-a11)",
-                "cursor": "pointer",
-                "&:hover": {"background": "var(--gray-a3)"},
-            },
+            style=_TOOL_LINK_STYLE,
         ),
-        rx.button(
+        rx.el.a(
             name,
             on_click=ToolTesterState.select_tool(name),
-            variant=rx.cond(
+            style=rx.cond(
                 ToolTesterState.selected_tool_name == name,
-                "solid",
-                "ghost",
+                _TOOL_LINK_ACTIVE_STYLE,
+                _TOOL_LINK_STYLE,
             ),
-            width="100%",
-            justify_content="flex-start",
-            size="1",
         ),
     )
 
