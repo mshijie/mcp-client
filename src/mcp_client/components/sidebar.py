@@ -20,7 +20,7 @@ def _tool_item(name: rx.Var[str]) -> rx.Component:
                 "border_radius": "var(--radius-2)",
                 "font_size": "14px",
                 "text_decoration": "none",
-                "color": "inherit",
+                "color": "var(--accent-a11)",
                 "cursor": "pointer",
                 "&:hover": {"background": "var(--gray-a3)"},
             },
