@@ -40,9 +40,6 @@ class ToolTesterState(ConnectionState):
     # Loading state for tab switch animation
     tab_loading: bool = False
 
-    # Result sub-tab state
-    result_tab: str = "content"
-    result_tab_loading: bool = False
 
     # --- Computed var compatibility layer ---
     # These expose the active tab's data with the same names as the old
@@ -136,7 +133,6 @@ class ToolTesterState(ConnectionState):
         self.active_tab = name
         self.sort_column = ""
         self.sort_ascending = True
-        self.result_tab = "content"
         self.tab_loading = True
         return type(self).finish_tab_loading
 
@@ -144,20 +140,6 @@ class ToolTesterState(ConnectionState):
     def finish_tab_loading(self):
         """Phase 2: clear loading flag after client has painted spinner."""
         self.tab_loading = False
-
-    @rx.event
-    def switch_result_tab(self, tab: str):
-        """Switch result sub-tab via event chaining."""
-        if tab == self.result_tab:
-            return
-        self.result_tab = tab
-        self.result_tab_loading = True
-        return type(self).finish_result_tab_loading
-
-    @rx.event
-    def finish_result_tab_loading(self):
-        """Phase 2: clear result tab loading flag."""
-        self.result_tab_loading = False
 
     @rx.event
     def close_tab(self, name: str):
