@@ -12,6 +12,10 @@ import requests
 def load_config(path: str = ".mcp.json") -> dict:
     """Load MCP server configuration from .mcp.json file."""
     config_path = Path(path)
+    if not config_path.is_absolute():
+        # Resolve relative to project root (where rxconfig.py lives)
+        project_root = Path(__file__).resolve().parent.parent.parent
+        config_path = project_root / path
     if not config_path.exists():
         return {"mcpServers": {}}
     with open(config_path, encoding="utf-8") as f:

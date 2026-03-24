@@ -1,3 +1,8 @@
+*.db
+.states
+.web
+assets/external/
+*.py[cod]
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -14,3 +19,7 @@ wheels/
 
 # MCP config (contains API keys)
 .mcp.json
+
+# Reflex
+.web/
+.agents/

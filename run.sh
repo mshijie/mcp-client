@@ -1,2 +1,2 @@
 #!/bin/bash
-uv run streamlit run app.py --server.headless false
+uv run reflex run

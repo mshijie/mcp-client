@@ -1,6 +1,6 @@
 # MCP Client
 
-Streamlit web app for connecting to MCP (Model Context Protocol) servers, browsing tools, and interacting with them.
+Reflex web app for connecting to MCP (Model Context Protocol) servers, browsing tools, and interacting with them.
 
 ## Features
 
@@ -10,16 +10,21 @@ Streamlit web app for connecting to MCP (Model Context Protocol) servers, browsi
 
 ## Dev Environment
 
-- Python >= 3.13
+- Python >= 3.12 (pinned to 3.13)
 - Package manager: uv
-- UI framework: Streamlit (wide layout, single-page app)
+- UI framework: Reflex (single-page app with sidebar layout)
+- Project layout: `src/` layout (`src/mcp_client/`)
 - Key files:
-  - `app.py` — Streamlit UI (sidebar navigation, tool tester, document view)
-  - `mcp_transport.py` — MCP protocol transport layer (HTTPTransport, StdioTransport, MCPClient)
+  - `rxconfig.py` — Reflex configuration (adds `src/` to sys.path)
+  - `src/mcp_client/mcp_client.py` — App entry point, page layout
+  - `src/mcp_client/mcp_transport.py` — MCP protocol transport layer (HTTPTransport, StdioTransport, MCPClient)
+  - `src/mcp_client/state/` — State classes (ConnectionState, ViewState, ToolTesterState)
+  - `src/mcp_client/components/` — UI components (sidebar, tool_form, tool_document, result_display)
+  - `src/mcp_client/utils/formatters.py` — Pure helper functions for result formatting
   - `.mcp.json` — server configuration (gitignored, contains API keys)
 
 ## Run
 
 ```
-uv run streamlit run app.py
+uv run reflex run
 ```
