@@ -157,6 +157,10 @@ class ToolTesterState(ConnectionState):
                 if m:
                     pair_labels = [m.group(1).strip(), m.group(2).strip()]
 
+            # Auto-select first enum value for required enum fields
+            if default is None and enum_values and name in required:
+                default = enum_values[0]
+
             if default is not None and prop_type in ("object", "array"):
                 default_str = json.dumps(default, ensure_ascii=False)
             elif default is not None:
