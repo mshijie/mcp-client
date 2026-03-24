@@ -34,12 +34,25 @@ def main_content() -> rx.Component:
                     icon="info",
                     size="2",
                 ),
-                rx.vstack(
-                    tool_form(),
-                    result_display(),
-                    width="100%",
-                    spacing="4",
-                    key=ToolTesterState.selected_tool_name,
+                rx.cond(
+                    ToolTesterState.tab_loading,
+                    rx.center(
+                        rx.vstack(
+                            rx.spinner(size="3"),
+                            rx.text("Loading...", size="2", color="gray"),
+                            align="center",
+                            spacing="2",
+                        ),
+                        width="100%",
+                        min_height="200px",
+                    ),
+                    rx.vstack(
+                        tool_form(),
+                        result_display(),
+                        width="100%",
+                        spacing="4",
+                        key=ToolTesterState.selected_tool_name,
+                    ),
                 ),
             ),
         ),

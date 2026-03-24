@@ -37,6 +37,9 @@ class ToolTesterState(ConnectionState):
     sort_column: str = ""
     sort_ascending: bool = True
 
+    # Loading state for tab switch animation
+    tab_loading: bool = False
+
     # --- Computed var compatibility layer ---
     # These expose the active tab's data with the same names as the old
     # single-tool state vars, so tool_form.py and result_display.py need
@@ -116,13 +119,21 @@ class ToolTesterState(ConnectionState):
 
     @rx.event
     def select_tool(self, name: str):
-        """Open a tool tab (or switch to it if already open)."""
+        """Open a tool tab (or switch to it if already open).
+
+        Two-phase yield: tab bar updates instantly, then content renders.
+        """
+        if name == self.active_tab:
+            return
         if name not in self.open_tabs:
             self.open_tabs = self.open_tabs + [name]
             self._init_form_data(name)
         self.active_tab = name
         self.sort_column = ""
         self.sort_ascending = True
+        self.tab_loading = True
+        yield
+        self.tab_loading = False
 
     @rx.event
     def close_tab(self, name: str):
@@ -140,10 +151,15 @@ class ToolTesterState(ConnectionState):
         if self.active_tab == name:
             if self.open_tabs:
                 self.active_tab = self.open_tabs[min(idx, len(self.open_tabs) - 1)]
+                self.sort_column = ""
+                self.sort_ascending = True
+                self.tab_loading = True
+                yield
+                self.tab_loading = False
             else:
                 self.active_tab = ""
-            self.sort_column = ""
-            self.sort_ascending = True
+                self.sort_column = ""
+                self.sort_ascending = True
 
     @rx.event
     def toggle_sort(self, column: str):
