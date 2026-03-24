@@ -26,42 +26,43 @@ def main_content() -> rx.Component:
         rx.cond(
             ViewState.is_document_mode,
             document_view(),
-            # Tester mode with tabs
-            rx.vstack(
-                tab_bar(),
-                rx.cond(
-                    ToolTesterState.active_tab == "",
-                    rx.callout(
-                        "Select a tool from the sidebar to view details and call it.",
-                        icon="info",
-                        size="2",
-                    ),
-                    rx.vstack(
-                        tool_form(),
-                        result_display(),
-                        width="100%",
-                        spacing="4",
-                        key=ToolTesterState.selected_tool_name,
-                    ),
+            # Tester mode: tab bar fixed, content scrolls
+            rx.cond(
+                ToolTesterState.active_tab == "",
+                rx.callout(
+                    "Select a tool from the sidebar to view details and call it.",
+                    icon="info",
+                    size="2",
                 ),
-                width="100%",
-                spacing="0",
+                rx.vstack(
+                    tool_form(),
+                    result_display(),
+                    width="100%",
+                    spacing="4",
+                    key=ToolTesterState.selected_tool_name,
+                ),
             ),
         ),
     )
 
 
-@rx.page(route="/", on_load=ConnectionState.load_config)
+@rx.page(route="/")
 def index() -> rx.Component:
     return rx.hstack(
         sidebar(),
-        rx.box(
-            main_content(),
+        rx.vstack(
+            tab_bar(),
+            rx.box(
+                main_content(),
+                flex="1",
+                padding="24px",
+                overflow_y="auto",
+                overscroll_behavior="none",
+                width="100%",
+            ),
             flex="1",
-            padding="24px",
-            overflow_y="auto",
-            overscroll_behavior="none",
             height="100vh",
+            spacing="0",
         ),
         width="100%",
         height="100vh",

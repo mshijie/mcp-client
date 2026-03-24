@@ -8,12 +8,23 @@ import reflex as rx
 from mcp_client.mcp_transport import MCPClient, load_config
 
 
+def _init_config() -> tuple[dict[str, dict], list[str], str]:
+    """Read .mcp.json at class-definition time so state has data immediately."""
+    cfg = load_config()
+    servers = cfg.get("mcpServers", {})
+    names = list(servers.keys())
+    return servers, names, names[0] if names else ""
+
+
+_INIT_CONFIGS, _INIT_NAMES, _INIT_SELECTED = _init_config()
+
+
 class ConnectionState(rx.State):
     """Base state: manages MCP server connections and tool discovery."""
 
-    server_configs: dict[str, dict] = {}
-    server_names: list[str] = []
-    selected_server: str = ""
+    server_configs: dict[str, dict] = _INIT_CONFIGS
+    server_names: list[str] = _INIT_NAMES
+    selected_server: str = _INIT_SELECTED
     connected_servers: dict[str, bool] = {}
     server_tool_counts: dict[str, int] = {}
     connect_error: str = ""

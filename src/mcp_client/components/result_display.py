@@ -10,12 +10,14 @@ _FULLSCREEN_JS = """
     if (!el) return;
     el.requestFullscreen().then(function() {
         el.style.maxHeight = '100vh';
+        el.style.overflowY = 'auto';
         el.style.padding = '20px';
         el.style.background = 'var(--color-background)';
     });
     document.addEventListener('fullscreenchange', function handler() {
         if (!document.fullscreenElement) {
-            el.style.maxHeight = '600px';
+            el.style.maxHeight = '';
+            el.style.overflowY = '';
             el.style.padding = '';
             el.style.background = '';
             document.removeEventListener('fullscreenchange', handler);
@@ -133,8 +135,6 @@ def _content_item(item: rx.Var[dict]) -> rx.Component:
                     id="result-table-container",
                     width="100%",
                     overflow_x="auto",
-                    max_height="600px",
-                    overflow_y="auto",
                 ),
                 width="100%",
                 spacing="2",
