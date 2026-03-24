@@ -3,11 +3,34 @@
 import json
 import re
 
+import pandas as pd
 import streamlit as st
 
 from mcp_transport import MCPClient, load_config
 
 st.set_page_config(page_title="MCP Tool Tester", layout="wide")
+
+st.markdown(
+    """
+    <style>
+        div[data-testid="stMainBlockContainer"] {
+            padding-top: 0.75rem !important;
+            padding-bottom: 2rem !important;
+        }
+
+        section[data-testid="stSidebar"] div[data-testid="stSidebarUserContent"] {
+            padding-top: 0.75rem !important;
+        }
+
+        div[data-testid="stHeader"] {
+            height: 0 !important;
+            min-height: 0 !important;
+            background: transparent !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # --- Session state defaults ---
 for key, default in {
@@ -16,6 +39,7 @@ for key, default in {
     "tools": {},
     "selected_server": None,
     "selected_tool": None,
+    "tool_search_query": {},
     "call_result": None,
     "connect_error": None,
     "call_error": None,
@@ -30,6 +54,30 @@ if st.session_state.config is None:
 
 config = st.session_state.config
 servers = config.get("mcpServers", {})
+
+
+def render_tool_summary(tool_def, *, heading_level="header"):
+    name = tool_def["name"]
+    description = tool_def.get("description", "")
+
+    if heading_level == "subheader":
+        st.subheader(name)
+    else:
+        st.header(name)
+
+    if description:
+        st.markdown(description)
+
+
+def render_tool_tabs(tool_def, parsed_label, raw_label, *, heading_level="header", render_parsed_content):
+    tab_parsed, tab_raw = st.tabs([parsed_label, raw_label])
+
+    with tab_parsed:
+        render_tool_summary(tool_def, heading_level=heading_level)
+        render_parsed_content()
+
+    with tab_raw:
+        st.json(tool_def)
 
 # ============================================================
 # SIDEBAR
@@ -98,44 +146,106 @@ with st.sidebar:
     if tools_list:
         st.markdown("### Tools")
 
+        search_query = st.text_input(
+            "Search tools",
+            value=st.session_state.tool_search_query.get(selected_server, ""),
+            key=f"tool_search_{selected_server}",
+            placeholder="Search by name or description",
+        ).strip()
+        st.session_state.tool_search_query[selected_server] = search_query
+
+        if search_query:
+            query = search_query.casefold()
+            filtered_tools = [
+                t for t in tools_list
+                if query in t["name"].casefold()
+                or query in t.get("description", "").casefold()
+            ]
+        else:
+            filtered_tools = tools_list
+
         def _tool_link_html(name, is_active, href=None):
             bg = "rgba(100,100,255,0.15)" if is_active else "none"
             weight = "600" if is_active else "normal"
-            marker = "▸ " if is_active else "&nbsp;&nbsp;"
             return (
                 f'<a href="{href}" style="display:block;padding:4px 8px;text-decoration:none;'
                 f"color:inherit;border-radius:4px;font-weight:{weight};background:{bg};font-size:14px;"
                 f'" onmouseover="this.style.background=\'rgba(128,128,128,0.15)\'"'
                 f' onmouseout="this.style.background=\'{bg}\'"'
-                f">{marker}{name}</a>"
+                f">{name}</a>"
             )
 
         if st.session_state.view_mode == "document":
-            links = "".join(_tool_link_html(t["name"], False, href=f'#{t["name"]}') for t in tools_list)
-            st.html(f'<div>{links}</div>')
+            links = "".join(_tool_link_html(t["name"], False, href=f'#{t["name"]}') for t in filtered_tools)
+            if links:
+                st.html(f'<div>{links}</div>')
+            else:
+                st.caption("No matching tools.")
         else:
-            # Compact button style to match document mode links
-            st.html("""<style>
-                div[data-testid="stSidebar"] .tool-list button {
-                    background: none; border: none; padding: 4px 8px; text-align: left;
-                    font-size: 14px; border-radius: 4px; cursor: pointer; width: 100%;
-                }
-                div[data-testid="stSidebar"] .tool-list button:hover { background: rgba(128,128,128,0.15); }
-                div[data-testid="stSidebar"] .tool-list button[kind="primary"] {
-                    background: rgba(100,100,255,0.15); font-weight: 600;
-                }
-            </style>""")
-            with st.container():
-                for t in tools_list:
-                    name = t["name"]
-                    is_active = name == st.session_state.selected_tool
-                    label = f"▸ {name}" if is_active else f"  {name}"
-                    if st.button(label, key=f"tool_btn_{name}", width="stretch",
-                                 type="primary" if is_active else "secondary"):
-                        st.session_state.selected_tool = name
-                        st.session_state.call_result = None
-                        st.session_state.call_error = None
-                        st.rerun()
+            if filtered_tools:
+                st.markdown("""<style>
+                    section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]:has(.tool-list-scope) div[data-testid="stButton"] {
+                        margin: 0;
+                    }
+                    section[data-testid="stSidebar"] button[kind="tertiary"],
+                    section[data-testid="stSidebar"] button[kind="primary"] {
+                        justify-content: flex-start !important;
+                        width: 100% !important;
+                        margin: 0 !important;
+                        padding: 4px 8px !important;
+                        border: none !important;
+                        border-radius: 4px !important;
+                        background: none !important;
+                        color: inherit !important;
+                        box-shadow: none !important;
+                        font-size: 14px !important;
+                        font-weight: 400 !important;
+                        line-height: 1.5 !important;
+                        min-height: auto !important;
+                    }
+                    section[data-testid="stSidebar"] button[kind="tertiary"]:hover,
+                    section[data-testid="stSidebar"] button[kind="primary"]:hover {
+                        background: rgba(128,128,128,0.15) !important;
+                        color: inherit !important;
+                    }
+                    section[data-testid="stSidebar"] button[kind="tertiary"] > div,
+                    section[data-testid="stSidebar"] button[kind="primary"] > div {
+                        justify-content: flex-start !important;
+                        width: 100% !important;
+                    }
+                    section[data-testid="stSidebar"] button[kind="tertiary"] p,
+                    section[data-testid="stSidebar"] button[kind="primary"] p {
+                        margin: 0 !important;
+                        width: 100% !important;
+                        text-align: left !important;
+                        color: inherit !important;
+                    }
+                    section[data-testid="stSidebar"] button[kind="primary"] {
+                        background: rgba(100,100,255,0.15) !important;
+                        color: inherit !important;
+                        font-weight: 600 !important;
+                    }
+                    section[data-testid="stSidebar"] button[kind="primary"] p {
+                        font-weight: 600 !important;
+                    }
+                </style>""", unsafe_allow_html=True)
+                with st.container():
+                    st.html('<div class="tool-list-scope"></div>')
+                    for t in filtered_tools:
+                        name = t["name"]
+                        is_active = name == st.session_state.selected_tool
+                        if st.button(
+                            name,
+                            key=f"tool_btn_{selected_server}_{name}",
+                            width="stretch",
+                            type="primary" if is_active else "tertiary",
+                        ):
+                            st.session_state.selected_tool = name
+                            st.session_state.call_result = None
+                            st.session_state.call_error = None
+                            st.rerun()
+            else:
+                st.caption("No matching tools.")
 
 # ============================================================
 # MAIN PANEL
@@ -151,8 +261,6 @@ if not active_server or active_server not in st.session_state.clients:
 # DOCUMENT VIEW
 # ============================================================
 if st.session_state.view_mode == "document":
-    import pandas as pd
-
     all_tools = st.session_state.tools.get(active_server, [])
     if not all_tools:
         st.info("No tools available.")
@@ -168,19 +276,14 @@ if st.session_state.view_mode == "document":
 
     for idx, t in enumerate(all_tools):
         name = t["name"]
-        desc = t.get("description", "")
         schema = t.get("inputSchema", {})
         props = schema.get("properties", {})
         req_fields = set(schema.get("required", []))
 
         # Anchor + header
         st.html(f'<div id="{name}" class="tool-anchor"></div>')
-        st.subheader(name)
-        if desc:
-            st.markdown(desc)
 
-        tab_params, tab_json = st.tabs(["Parameters", "Tool Definition"])
-        with tab_params:
+        def _render_doc_params(props=props, req_fields=req_fields):
             if props:
                 rows = []
                 for pname, prop in props.items():
@@ -195,8 +298,14 @@ if st.session_state.view_mode == "document":
                 st.dataframe(df, width="stretch", hide_index=True, height=(len(rows) + 1) * 35 + 3)
             else:
                 st.caption("This tool takes no parameters.")
-        with tab_json:
-            st.json(t)
+
+        render_tool_tabs(
+            t,
+            "Tool Info",
+            "Raw JSON",
+            heading_level="subheader",
+            render_parsed_content=_render_doc_params,
+        )
 
         if idx < len(all_tools) - 1:
             st.divider()
@@ -215,22 +324,17 @@ if not tool_def:
     st.error(f"Tool '{selected_tool_name}' not found.")
     st.stop()
 
-# --- Tool header ---
-st.header(tool_def["name"])
-if tool_def.get("description"):
-    st.markdown(tool_def["description"])
-
-tab_tool, tab_def = st.tabs(["Parameters", "Tool Definition"])
-
-with tab_def:
-    st.json(tool_def)
-
 # --- Parameter schema & form ---
 input_schema = tool_def.get("inputSchema", {})
 properties = input_schema.get("properties", {})
 required_fields = set(input_schema.get("required", []))
+tool_form_state = {
+    "params": {},
+    "missing": [],
+    "call_clicked": False,
+}
 
-with tab_tool:
+def _render_tool_form():
     _backup = st.session_state.get("_param_backup", {})
 
     def _bk(key, default):
@@ -339,27 +443,37 @@ with tab_tool:
 
     # Validate required fields
     missing = [f for f in required_fields if f not in params]
+    tool_form_state["params"] = params
+    tool_form_state["missing"] = missing
 
     st.divider()
 
     # --- Call tool ---
     col1, col2 = st.columns([1, 4])
     with col1:
-        call_clicked = st.button("Call Tool", type="primary", width="stretch")
+        tool_form_state["call_clicked"] = st.button("Call Tool", type="primary", width="stretch")
     with col2:
         if missing:
             st.warning(f"Missing required: {', '.join(missing)}")
 
-if call_clicked:
-    if missing:
-        st.error(f"Please fill required parameters: {', '.join(missing)}")
+
+render_tool_tabs(
+    tool_def,
+    "Tool Info",
+    "Raw JSON",
+    render_parsed_content=_render_tool_form,
+)
+
+if tool_form_state["call_clicked"]:
+    if tool_form_state["missing"]:
+        st.error(f"Please fill required parameters: {', '.join(tool_form_state['missing'])}")
     else:
         st.session_state.call_error = None
-        st.session_state.call_params = params
+        st.session_state.call_params = tool_form_state["params"]
         try:
             client = st.session_state.clients[active_server]
             with st.spinner("Calling tool..."):
-                result = client.call_tool(selected_tool_name, params)
+                result = client.call_tool(selected_tool_name, tool_form_state["params"])
             st.session_state.call_result = result
         except Exception as e:
             st.session_state.call_error = str(e)
