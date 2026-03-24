@@ -18,13 +18,6 @@ _TOOL_LINK_STYLE = {
     "&:hover": {"background": "var(--gray-a3)"},
 }
 
-_TOOL_LINK_ACTIVE_STYLE = {
-    **_TOOL_LINK_STYLE,
-    "background": "var(--accent-9)",
-    "color": "white",
-    "&:hover": {"background": "var(--accent-10)"},
-}
-
 
 def _tool_item(name: rx.Var[str]) -> rx.Component:
     """A single tool item — consistent link style for both modes."""
@@ -38,11 +31,19 @@ def _tool_item(name: rx.Var[str]) -> rx.Component:
         rx.el.a(
             name,
             on_click=ToolTesterState.select_tool(name),
-            style=rx.cond(
-                ToolTesterState.selected_tool_name == name,
-                _TOOL_LINK_ACTIVE_STYLE,
-                _TOOL_LINK_STYLE,
-            ),
+            style={
+                **_TOOL_LINK_STYLE,
+                "background": rx.cond(
+                    ToolTesterState.selected_tool_name == name,
+                    "var(--accent-9)",
+                    "none",
+                ),
+                "color": rx.cond(
+                    ToolTesterState.selected_tool_name == name,
+                    "white",
+                    "var(--accent-a11)",
+                ),
+            },
         ),
     )
 
