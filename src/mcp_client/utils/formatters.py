@@ -30,22 +30,19 @@ def split_text_segments(text: str) -> list[tuple[str, Any]]:
             pass
 
     segments: list[tuple[str, Any]] = []
-    pos = 0
+    pos = 0       # start of unprocessed text (only advances on extraction)
+    scan = 0      # where to look for the next JSON candidate
     length = len(stripped)
 
-    while pos < length:
+    while scan < length:
         # Find next potential JSON start
         next_start = -1
-        for i in range(pos, length):
+        for i in range(scan, length):
             if stripped[i] in ("{", "["):
                 next_start = i
                 break
 
         if next_start == -1:
-            # No more braces — rest is text
-            remaining = stripped[pos:].strip()
-            if remaining:
-                segments.append(("text", remaining))
             break
 
         # Use brace-depth counting to find matching close
@@ -79,8 +76,8 @@ def split_text_segments(text: str) -> list[tuple[str, Any]]:
                     break
 
         if match_end == -1:
-            # Unmatched brace — skip past it as text
-            pos = next_start + 1
+            # Unmatched brace — skip past it, continue scanning
+            scan = next_start + 1
             continue
 
         candidate = stripped[next_start : match_end + 1]
@@ -90,18 +87,24 @@ def split_text_segments(text: str) -> list[tuple[str, Any]]:
             parsed = None
 
         if parsed is not None and _is_nontrivial(parsed):
-            # Emit text before the JSON
+            # Emit text from pos to the start of the JSON
             before = stripped[pos:next_start].strip()
             if before:
                 segments.append(("text", before))
             segments.append(("json", parsed))
             pos = match_end + 1
+            scan = pos
         else:
-            # Not valid or trivial JSON — skip past the entire matched region
-            # so that closing braces (e.g. from {}) don't leak into text
-            pos = match_end + 1
+            # Trivial/invalid — skip past it but DON'T advance pos,
+            # so the surrounding text (including {}/[]) stays in the
+            # pending text buffer.
+            scan = match_end + 1
 
-    # If nothing was extracted, return whole text
+    # Emit remaining text
+    remaining = stripped[pos:].strip()
+    if remaining:
+        segments.append(("text", remaining))
+
     if not segments:
         return [("text", stripped)]
 
