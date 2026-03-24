@@ -121,70 +121,68 @@ class ToolTesterState(ConnectionState):
                     data[f"param_{pname}"] = str(default)
         self.tab_form_data[tool_name] = data
 
-    @rx.event(background=True)
-    async def select_tool(self, name: str):
+    @rx.event
+    def select_tool(self, name: str):
         """Open a tool tab (or switch to it if already open).
 
-        Background task with sleep ensures the browser paints the loading
-        state before the heavy content renders.
+        Returns finish_tab_loading so Phase 2 runs after the client
+        round-trips back, guaranteeing the spinner is painted first.
         """
-        async with self:
-            if name == self.active_tab:
-                return
-            if name not in self.open_tabs:
-                self.open_tabs = self.open_tabs + [name]
-                self._init_form_data(name)
-            self.active_tab = name
-            self.sort_column = ""
-            self.sort_ascending = True
-            self.result_tab = "content"
-            self.tab_loading = True
-        await asyncio.sleep(0.02)
-        async with self:
-            self.tab_loading = False
+        if name == self.active_tab:
+            return
+        if name not in self.open_tabs:
+            self.open_tabs = self.open_tabs + [name]
+            self._init_form_data(name)
+        self.active_tab = name
+        self.sort_column = ""
+        self.sort_ascending = True
+        self.result_tab = "content"
+        self.tab_loading = True
+        return type(self).finish_tab_loading
 
-    @rx.event(background=True)
-    async def switch_result_tab(self, tab: str):
-        """Switch result sub-tab with guaranteed paint frame."""
-        async with self:
-            if tab == self.result_tab:
-                return
-            self.result_tab = tab
-            self.result_tab_loading = True
-        await asyncio.sleep(0.02)
-        async with self:
-            self.result_tab_loading = False
+    @rx.event
+    def finish_tab_loading(self):
+        """Phase 2: clear loading flag after client has painted spinner."""
+        self.tab_loading = False
 
-    @rx.event(background=True)
-    async def close_tab(self, name: str):
+    @rx.event
+    def switch_result_tab(self, tab: str):
+        """Switch result sub-tab via event chaining."""
+        if tab == self.result_tab:
+            return
+        self.result_tab = tab
+        self.result_tab_loading = True
+        return type(self).finish_result_tab_loading
+
+    @rx.event
+    def finish_result_tab_loading(self):
+        """Phase 2: clear result tab loading flag."""
+        self.result_tab_loading = False
+
+    @rx.event
+    def close_tab(self, name: str):
         """Close a tab and clean up its state."""
-        needs_loading = False
-        async with self:
-            if name not in self.open_tabs:
-                return
-            idx = self.open_tabs.index(name)
-            self.open_tabs = [t for t in self.open_tabs if t != name]
-            self.tab_results.pop(name, None)
-            self.tab_errors.pop(name, None)
-            self.tab_params.pop(name, None)
-            self.tab_calling.pop(name, None)
-            self.tab_form_data.pop(name, None)
-            # Switch to nearest neighbor if closing the active tab
-            if self.active_tab == name:
-                if self.open_tabs:
-                    self.active_tab = self.open_tabs[min(idx, len(self.open_tabs) - 1)]
-                    self.sort_column = ""
-                    self.sort_ascending = True
-                    self.tab_loading = True
-                    needs_loading = True
-                else:
-                    self.active_tab = ""
-                    self.sort_column = ""
-                    self.sort_ascending = True
-        if needs_loading:
-            await asyncio.sleep(0.02)
-            async with self:
-                self.tab_loading = False
+        if name not in self.open_tabs:
+            return
+        idx = self.open_tabs.index(name)
+        self.open_tabs = [t for t in self.open_tabs if t != name]
+        self.tab_results.pop(name, None)
+        self.tab_errors.pop(name, None)
+        self.tab_params.pop(name, None)
+        self.tab_calling.pop(name, None)
+        self.tab_form_data.pop(name, None)
+        # Switch to nearest neighbor if closing the active tab
+        if self.active_tab == name:
+            if self.open_tabs:
+                self.active_tab = self.open_tabs[min(idx, len(self.open_tabs) - 1)]
+                self.sort_column = ""
+                self.sort_ascending = True
+                self.tab_loading = True
+                return type(self).finish_tab_loading
+            else:
+                self.active_tab = ""
+                self.sort_column = ""
+                self.sort_ascending = True
 
     @rx.event
     def toggle_sort(self, column: str):
