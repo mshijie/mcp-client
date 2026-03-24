@@ -6,7 +6,8 @@ from mcp_client.state.tool_tester import ToolTesterState
 
 _FULLSCREEN_JS = """
 (function() {
-    var el = document.getElementById('result-table-container');
+    var btn = event.currentTarget;
+    var el = btn.closest('.result-table-container');
     if (!el) return;
     el.requestFullscreen().then(function() {
         el.style.maxHeight = '100vh';
@@ -105,10 +106,10 @@ def _table_toolbar() -> rx.Component:
 def _content_item(item: rx.Var[dict]) -> rx.Component:
     """Render a single content item with smart formatting."""
     return rx.vstack(
-        # Prefix text
+        # Section title (from dict explosion)
         rx.cond(
-            item["has_prefix"].to(bool),
-            rx.text(item["prefix"].to(str), color="gray", size="2"),
+            item["has_section_title"].to(bool),
+            rx.heading(item["section_title"].to(str), size="3", color="var(--accent-11)"),
         ),
         # Main content
         rx.cond(
@@ -132,7 +133,7 @@ def _content_item(item: rx.Var[dict]) -> rx.Component:
                         width="100%",
                         size="1",
                     ),
-                    id="result-table-container",
+                    class_name="result-table-container",
                     width="100%",
                     overflow_x="auto",
                 ),
@@ -146,17 +147,12 @@ def _content_item(item: rx.Var[dict]) -> rx.Component:
                     language="json",
                     width="100%",
                 ),
-                # Plain text (only if no prefix was already shown)
+                # Plain text
                 rx.cond(
-                    ~item["has_prefix"].to(bool),
+                    item["is_text"].to(bool),
                     rx.text(item["text"].to(str), size="2", white_space="pre-wrap"),
                 ),
             ),
-        ),
-        # Suffix text
-        rx.cond(
-            item["has_suffix"].to(bool),
-            rx.text(item["suffix"].to(str), color="gray", size="2"),
         ),
         width="100%",
         spacing="2",
@@ -189,10 +185,19 @@ def result_display() -> rx.Component:
                     padding="12px 0",
                 ),
                 rx.tabs.content(
-                    rx.code_block(
-                        ToolTesterState.result_json_str,
-                        language="json",
+                    rx.el.pre(
+                        rx.el.code(
+                            ToolTesterState.result_json_str,
+                        ),
+                        white_space="pre-wrap",
+                        word_break="break-all",
+                        overflow_wrap="break-word",
                         width="100%",
+                        padding="1em",
+                        background="var(--gray-2)",
+                        border_radius="var(--radius-2)",
+                        font_size="0.85em",
+                        overflow_x="hidden",
                     ),
                     value="raw",
                     padding="12px 0",

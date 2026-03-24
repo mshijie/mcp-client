@@ -8,7 +8,15 @@ from typing import Any
 import reflex as rx
 
 from mcp_client.state.connection import ConnectionState
-from mcp_client.utils.formatters import detect_image_columns, is_table_data, split_text_and_json
+from mcp_client.utils.formatters import (
+    _make_display_item,
+    _make_table_item,
+    explode_dict,
+    has_complex_values,
+    is_flat_dict,
+    is_table_data,
+    split_text_segments,
+)
 
 
 class ToolTesterState(ConnectionState):
@@ -263,48 +271,55 @@ class ToolTesterState(ConnectionState):
         if not self.call_result:
             return []
         contents = self.call_result.get("content", [])
-        items = []
+        items: list[dict[str, Any]] = []
         for item in contents:
             if item.get("type") == "text":
-                prefix, parsed, suffix = split_text_and_json(item["text"])
-                display: dict[str, Any] = {
-                    "has_prefix": bool(prefix),
-                    "prefix": prefix,
-                    "has_suffix": bool(suffix),
-                    "suffix": suffix,
-                    "is_table": False,
-                    "is_json": False,
-                    "text": item["text"],
-                    "json_str": "",
-                    "table_columns": [],
-                    "table_rows": [],
-                    "image_columns": [],
-                }
-                if parsed is not None:
-                    if is_table_data(parsed):
-                        display["is_table"] = True
-                        display["table_columns"] = list(parsed[0].keys())
-                        rows = [
-                            {k: str(v) if v is not None else "" for k, v in row.items()}
-                            for row in parsed
-                        ]
-                        # Apply sorting
-                        if self.sort_column and self.sort_column in display["table_columns"]:
-                            def _sort_key(r: dict) -> tuple:
-                                val = r.get(self.sort_column, "")
-                                try:
-                                    num = float(val.replace("%", "").replace(",", ""))
-                                    return (0, num)
-                                except (ValueError, AttributeError):
-                                    return (1, val.lower() if isinstance(val, str) else str(val))
-                            rows.sort(key=_sort_key, reverse=not self.sort_ascending)
-                        display["table_rows"] = rows
-                        display["image_columns"] = detect_image_columns(parsed)
-                    else:
-                        display["is_json"] = True
-                        display["json_str"] = json.dumps(parsed, indent=2, ensure_ascii=False)
-                items.append(display)
+                segments = split_text_segments(item["text"])
+                for seg_type, seg_data in segments:
+                    if seg_type == "text":
+                        items.append(_make_display_item(is_text=True, text=seg_data))
+                    elif seg_type == "json":
+                        items.extend(self._classify_json(seg_data))
+        # Apply sorting to all table items
+        self._apply_sorting(items)
         return items
+
+    def _classify_json(self, parsed: object) -> list[dict[str, Any]]:
+        """Classify a parsed JSON value into one or more display items."""
+        if is_table_data(parsed):
+            return [_make_table_item(parsed)]
+        if isinstance(parsed, dict) and has_complex_values(parsed):
+            return explode_dict(parsed)
+        if is_flat_dict(parsed):
+            kv_rows = [{"Key": str(k), "Value": str(v) if v is not None else ""} for k, v in parsed.items()]
+            return [_make_table_item(kv_rows, override_columns=["Key", "Value"])]
+        return [_make_display_item(
+            is_json=True,
+            json_str=json.dumps(parsed, indent=2, ensure_ascii=False),
+        )]
+
+    def _apply_sorting(self, items: list[dict[str, Any]]) -> None:
+        """Apply current sort_column/sort_ascending to all table items in-place."""
+        if not self.sort_column:
+            return
+        for display in items:
+            if not display.get("is_table"):
+                continue
+            columns = display.get("table_columns", [])
+            if self.sort_column not in columns:
+                continue
+            rows = display.get("table_rows", [])
+            sort_col = self.sort_column
+
+            def _sort_key(r: dict) -> tuple:
+                val = r.get(sort_col, "")
+                try:
+                    num = float(val.replace("%", "").replace(",", ""))
+                    return (0, num)
+                except (ValueError, AttributeError):
+                    return (1, val.lower() if isinstance(val, str) else str(val))
+
+            rows.sort(key=_sort_key, reverse=not self.sort_ascending)
 
     @rx.var(cache=True)
     def result_json_str(self) -> str:
