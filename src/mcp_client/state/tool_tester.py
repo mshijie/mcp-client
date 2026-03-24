@@ -19,6 +19,8 @@ class ToolTesterState(ConnectionState):
     call_error: str = ""
     call_params: dict = {}
     is_calling: bool = False
+    sort_column: str = ""
+    sort_ascending: bool = True
 
     @rx.event
     def select_tool(self, name: str):
@@ -26,6 +28,33 @@ class ToolTesterState(ConnectionState):
         self.call_result = {}
         self.call_error = ""
         self.call_params = {}
+        self.sort_column = ""
+        self.sort_ascending = True
+
+    @rx.event
+    def toggle_sort(self, column: str):
+        if self.sort_column == column:
+            self.sort_ascending = not self.sort_ascending
+        else:
+            self.sort_column = column
+            self.sort_ascending = True
+
+    @rx.event
+    def download_table_csv(self):
+        """Download the first table in results as CSV."""
+        import csv
+        import io
+
+        contents = self.result_contents
+        for item_data in contents:
+            if item_data.get("is_table"):
+                output = io.StringIO()
+                writer = csv.writer(output)
+                columns = item_data["table_columns"]
+                writer.writerow(columns)
+                for row in item_data["table_rows"]:
+                    writer.writerow([row.get(col, "") for col in columns])
+                return rx.download(data=output.getvalue(), filename="table_data.csv")
 
     @rx.var(cache=True)
     def selected_tool_def(self) -> dict:
@@ -79,7 +108,7 @@ class ToolTesterState(ConnectionState):
             enum_list: list[str] = []
             if enum_values:
                 if name not in required:
-                    enum_list = [""] + [str(v) for v in enum_values]
+                    enum_list = ["(none)"] + [str(v) for v in enum_values]
                 else:
                     enum_list = [str(v) for v in enum_values]
 
@@ -137,10 +166,21 @@ class ToolTesterState(ConnectionState):
                     if is_table_data(parsed):
                         display["is_table"] = True
                         display["table_columns"] = list(parsed[0].keys())
-                        display["table_rows"] = [
+                        rows = [
                             {k: str(v) if v is not None else "" for k, v in row.items()}
                             for row in parsed
                         ]
+                        # Apply sorting
+                        if self.sort_column and self.sort_column in display["table_columns"]:
+                            def _sort_key(r: dict) -> tuple:
+                                val = r.get(self.sort_column, "")
+                                try:
+                                    num = float(val.replace("%", "").replace(",", ""))
+                                    return (0, num)
+                                except (ValueError, AttributeError):
+                                    return (1, val.lower() if isinstance(val, str) else str(val))
+                            rows.sort(key=_sort_key, reverse=not self.sort_ascending)
+                        display["table_rows"] = rows
                         display["image_columns"] = detect_image_columns(parsed)
                     else:
                         display["is_json"] = True
@@ -190,7 +230,7 @@ class ToolTesterState(ConnectionState):
                             params[name] = items
                 else:
                     val = str(form_data.get(prop["form_key"], "")).strip()
-                    if not val:
+                    if not val or val == "(none)":
                         continue
                     if prop["has_enum"]:
                         params[name] = val
