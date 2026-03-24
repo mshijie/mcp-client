@@ -40,6 +40,10 @@ class ToolTesterState(ConnectionState):
     # Loading state for tab switch animation
     tab_loading: bool = False
 
+    # Result sub-tab state
+    result_tab: str = "content"
+    result_tab_loading: bool = False
+
     # --- Computed var compatibility layer ---
     # These expose the active tab's data with the same names as the old
     # single-tool state vars, so tool_form.py and result_display.py need
@@ -131,9 +135,20 @@ class ToolTesterState(ConnectionState):
         self.active_tab = name
         self.sort_column = ""
         self.sort_ascending = True
+        self.result_tab = "content"
         self.tab_loading = True
         yield
         self.tab_loading = False
+
+    @rx.event
+    def switch_result_tab(self, tab: str):
+        """Switch result sub-tab with two-phase yield."""
+        if tab == self.result_tab:
+            return
+        self.result_tab = tab
+        self.result_tab_loading = True
+        yield
+        self.result_tab_loading = False
 
     @rx.event
     def close_tab(self, name: str):

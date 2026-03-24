@@ -159,32 +159,35 @@ def _content_item(item: rx.Var[dict]) -> rx.Component:
     )
 
 
-def result_display() -> rx.Component:
-    """Display tool call results with Content/Full Response/Params tabs."""
+def _result_content_panel() -> rx.Component:
+    """Content panel — only the active result tab is rendered."""
     return rx.cond(
-        ToolTesterState.has_result,
-        rx.vstack(
-            rx.heading("Result", size="4"),
-            rx.tabs.root(
-                rx.tabs.list(
-                    rx.tabs.trigger("Content", value="content"),
-                    rx.tabs.trigger("Full Response", value="raw"),
-                    rx.tabs.trigger("Request Params", value="params"),
-                ),
-                rx.tabs.content(
-                    rx.cond(
-                        ToolTesterState.result_contents.length() > 0,
-                        rx.vstack(
-                            rx.foreach(ToolTesterState.result_contents, _content_item),
-                            width="100%",
-                            spacing="3",
-                        ),
-                        rx.text("No content", color="gray"),
+        ToolTesterState.result_tab_loading,
+        rx.center(
+            rx.spinner(size="3"),
+            width="100%",
+            min_height="100px",
+        ),
+        rx.cond(
+            ToolTesterState.result_tab == "content",
+            # Content tab
+            rx.box(
+                rx.cond(
+                    ToolTesterState.result_contents.length() > 0,
+                    rx.vstack(
+                        rx.foreach(ToolTesterState.result_contents, _content_item),
+                        width="100%",
+                        spacing="3",
                     ),
-                    value="content",
-                    padding="12px 0",
+                    rx.text("No content", color="gray"),
                 ),
-                rx.tabs.content(
+                padding="12px 0",
+                width="100%",
+            ),
+            rx.cond(
+                ToolTesterState.result_tab == "raw",
+                # Full Response tab
+                rx.box(
                     rx.el.pre(
                         rx.el.code(
                             ToolTesterState.result_json_str,
@@ -199,10 +202,11 @@ def result_display() -> rx.Component:
                         font_size="0.85em",
                         overflow_x="hidden",
                     ),
-                    value="raw",
                     padding="12px 0",
+                    width="100%",
                 ),
-                rx.tabs.content(
+                # Request Params tab
+                rx.box(
                     rx.cond(
                         ToolTesterState.call_params_json_str != "",
                         rx.code_block(
@@ -212,12 +216,31 @@ def result_display() -> rx.Component:
                         ),
                         rx.text("No params", color="gray"),
                     ),
-                    value="params",
                     padding="12px 0",
+                    width="100%",
                 ),
-                default_value="content",
+            ),
+        ),
+    )
+
+
+def result_display() -> rx.Component:
+    """Display tool call results with Content/Full Response/Params tabs."""
+    return rx.cond(
+        ToolTesterState.has_result,
+        rx.vstack(
+            rx.heading("Result", size="4"),
+            rx.tabs.root(
+                rx.tabs.list(
+                    rx.tabs.trigger("Content", value="content"),
+                    rx.tabs.trigger("Full Response", value="raw"),
+                    rx.tabs.trigger("Request Params", value="params"),
+                ),
+                value=ToolTesterState.result_tab,
+                on_change=ToolTesterState.switch_result_tab,
                 width="100%",
             ),
+            _result_content_panel(),
             width="100%",
             spacing="3",
         ),
