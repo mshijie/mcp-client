@@ -35,7 +35,11 @@ def _tool_item(name: rx.Var[str]) -> rx.Component:
                 "background": rx.cond(
                     ToolTesterState.selected_tool_name == name,
                     "var(--accent-9)",
-                    "none",
+                    rx.cond(
+                        ToolTesterState.open_tabs.contains(name),
+                        "var(--accent-a3)",
+                        "none",
+                    ),
                 ),
                 "color": rx.cond(
                     ToolTesterState.selected_tool_name == name,

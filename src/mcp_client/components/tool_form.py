@@ -122,117 +122,74 @@ def _param_row(prop: rx.Var[dict]) -> rx.Component:
     )
 
 
+def _call_button_row() -> rx.Component:
+    """Call Tool button and error callout."""
+    return rx.hstack(
+        rx.button(
+            rx.cond(
+                ToolTesterState.is_calling,
+                rx.hstack(rx.spinner(size="1"), rx.text("Calling..."), spacing="2"),
+                rx.text("Call Tool"),
+            ),
+            type="submit",
+            disabled=ToolTesterState.is_calling,
+        ),
+        rx.cond(
+            ToolTesterState.call_error != "",
+            rx.callout(
+                ToolTesterState.call_error,
+                icon="triangle_alert",
+                color_scheme="red",
+                size="1",
+            ),
+        ),
+        align="center",
+        spacing="3",
+    )
+
+
 def tool_form() -> rx.Component:
     """The tool parameter form with Call Tool button."""
     return rx.vstack(
-        rx.tabs.root(
-            rx.tabs.list(
-                rx.tabs.trigger("Tool Info", value="info"),
-                rx.tabs.trigger("Raw JSON", value="raw"),
-            ),
-            rx.tabs.content(
+        rx.cond(
+            ToolTesterState.tool_description != "",
+            rx.text(ToolTesterState.tool_description),
+        ),
+        rx.cond(
+            ToolTesterState.has_properties,
+            rx.form(
                 rx.vstack(
-                    rx.heading(ToolTesterState.selected_tool_name, size="5"),
-                    rx.cond(
-                        ToolTesterState.tool_description != "",
-                        rx.text(ToolTesterState.tool_description),
+                    # Header
+                    rx.hstack(
+                        rx.box(rx.text("Name", weight="bold", size="2"), width="20%", min_width="120px"),
+                        rx.box(rx.text("Value", weight="bold", size="2"), width="25%", min_width="160px"),
+                        rx.box(rx.text("Description", weight="bold", size="2"), width="55%"),
+                        width="100%",
+                        spacing="3",
                     ),
                     rx.separator(),
-                    rx.cond(
-                        ToolTesterState.has_properties,
-                        rx.form(
-                            rx.vstack(
-                                # Header
-                                rx.hstack(
-                                    rx.box(rx.text("Name", weight="bold", size="2"), width="20%", min_width="120px"),
-                                    rx.box(rx.text("Value", weight="bold", size="2"), width="25%", min_width="160px"),
-                                    rx.box(rx.text("Description", weight="bold", size="2"), width="55%"),
-                                    width="100%",
-                                    spacing="3",
-                                ),
-                                rx.separator(),
-                                # Parameter rows
-                                rx.foreach(ToolTesterState.properties, _param_row),
-                                rx.separator(),
-                                # Call button + error
-                                rx.hstack(
-                                    rx.button(
-                                        rx.cond(
-                                            ToolTesterState.is_calling,
-                                            rx.hstack(rx.spinner(size="1"), rx.text("Calling..."), spacing="2"),
-                                            rx.text("Call Tool"),
-                                        ),
-                                        type="submit",
-                                        disabled=ToolTesterState.is_calling,
-                                    ),
-                                    rx.cond(
-                                        ToolTesterState.call_error != "",
-                                        rx.callout(
-                                            ToolTesterState.call_error,
-                                            icon="triangle_alert",
-                                            color_scheme="red",
-                                            size="1",
-                                        ),
-                                    ),
-                                    align="center",
-                                    spacing="3",
-                                ),
-                                width="100%",
-                                spacing="3",
-                            ),
-                            on_submit=ToolTesterState.call_tool,
-                            width="100%",
-                        ),
-                        rx.form(
-                            rx.vstack(
-                                rx.text("This tool takes no parameters.", color="gray", size="2"),
-                                rx.separator(),
-                                rx.hstack(
-                                    rx.button(
-                                        rx.cond(
-                                            ToolTesterState.is_calling,
-                                            rx.hstack(rx.spinner(size="1"), rx.text("Calling..."), spacing="2"),
-                                            rx.text("Call Tool"),
-                                        ),
-                                        type="submit",
-                                        disabled=ToolTesterState.is_calling,
-                                    ),
-                                    rx.cond(
-                                        ToolTesterState.call_error != "",
-                                        rx.callout(
-                                            ToolTesterState.call_error,
-                                            icon="triangle_alert",
-                                            color_scheme="red",
-                                            size="1",
-                                        ),
-                                    ),
-                                    align="center",
-                                    spacing="3",
-                                ),
-                                width="100%",
-                                spacing="3",
-                            ),
-                            on_submit=ToolTesterState.call_tool,
-                            width="100%",
-                        ),
-                    ),
+                    # Parameter rows
+                    rx.foreach(ToolTesterState.properties, _param_row),
+                    rx.separator(),
+                    _call_button_row(),
                     width="100%",
                     spacing="3",
-                    padding="12px 0",
                 ),
-                value="info",
+                on_submit=ToolTesterState.call_tool,
+                width="100%",
             ),
-            rx.tabs.content(
-                rx.code_block(
-                    ToolTesterState.tool_def_json,
-                    language="json",
+            rx.form(
+                rx.vstack(
+                    rx.text("This tool takes no parameters.", color="gray", size="2"),
+                    rx.separator(),
+                    _call_button_row(),
                     width="100%",
+                    spacing="3",
                 ),
-                value="raw",
-                padding="12px 0",
+                on_submit=ToolTesterState.call_tool,
+                width="100%",
             ),
-            default_value="info",
-            width="100%",
         ),
         width="100%",
+        spacing="3",
     )
