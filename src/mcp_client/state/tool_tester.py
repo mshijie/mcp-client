@@ -1,4 +1,4 @@
-"""ToolTesterState — tool selection, parameter form, and call execution."""
+"""ToolTesterState — multi-tab tool testing with per-tab state."""
 
 import asyncio
 import json
@@ -12,24 +12,81 @@ from mcp_client.utils.formatters import detect_image_columns, is_table_data, spl
 
 
 class ToolTesterState(ConnectionState):
-    """Manages tool selection, form parameters, and call results. Inherits connection data."""
+    """Manages multi-tab tool testing. Each open tool has independent state."""
 
-    selected_tool_name: str = ""
-    call_result: dict = {}
-    call_error: str = ""
-    call_params: dict = {}
-    is_calling: bool = False
+    # Tab management
+    open_tabs: list[str] = []
+    active_tab: str = ""
+
+    # Per-tab state (keyed by tool name)
+    tab_results: dict[str, dict] = {}
+    tab_errors: dict[str, str] = {}
+    tab_params: dict[str, dict] = {}
+    tab_calling: dict[str, bool] = {}
+
+    # Table sorting (shared, resets on tab switch)
     sort_column: str = ""
     sort_ascending: bool = True
 
+    # --- Computed var compatibility layer ---
+    # These expose the active tab's data with the same names as the old
+    # single-tool state vars, so tool_form.py and result_display.py need
+    # zero changes to their state references.
+
+    @rx.var(cache=True)
+    def selected_tool_name(self) -> str:
+        return self.active_tab
+
+    @rx.var(cache=True)
+    def call_result(self) -> dict:
+        return self.tab_results.get(self.active_tab, {})
+
+    @rx.var(cache=True)
+    def call_error(self) -> str:
+        return self.tab_errors.get(self.active_tab, "")
+
+    @rx.var(cache=True)
+    def call_params(self) -> dict:
+        return self.tab_params.get(self.active_tab, {})
+
+    @rx.var(cache=True)
+    def is_calling(self) -> bool:
+        return self.tab_calling.get(self.active_tab, False)
+
+    @rx.var(cache=True)
+    def has_open_tabs(self) -> bool:
+        return len(self.open_tabs) > 0
+
+    # --- Event handlers ---
+
     @rx.event
     def select_tool(self, name: str):
-        self.selected_tool_name = name
-        self.call_result = {}
-        self.call_error = ""
-        self.call_params = {}
+        """Open a tool tab (or switch to it if already open)."""
+        if name not in self.open_tabs:
+            self.open_tabs = self.open_tabs + [name]
+        self.active_tab = name
         self.sort_column = ""
         self.sort_ascending = True
+
+    @rx.event
+    def close_tab(self, name: str):
+        """Close a tab and clean up its state."""
+        if name not in self.open_tabs:
+            return
+        idx = self.open_tabs.index(name)
+        self.open_tabs = [t for t in self.open_tabs if t != name]
+        self.tab_results.pop(name, None)
+        self.tab_errors.pop(name, None)
+        self.tab_params.pop(name, None)
+        self.tab_calling.pop(name, None)
+        # Switch to nearest neighbor if closing the active tab
+        if self.active_tab == name:
+            if self.open_tabs:
+                self.active_tab = self.open_tabs[min(idx, len(self.open_tabs) - 1)]
+            else:
+                self.active_tab = ""
+            self.sort_column = ""
+            self.sort_ascending = True
 
     @rx.event
     def toggle_sort(self, column: str):
@@ -55,6 +112,8 @@ class ToolTesterState(ConnectionState):
                 for row in item_data["table_rows"]:
                     writer.writerow([row.get(col, "") for col in columns])
                 return rx.download(data=output.getvalue(), filename="table_data.csv")
+
+    # --- Existing computed vars (unchanged, derive from compatibility layer) ---
 
     @rx.var(cache=True)
     def selected_tool_def(self) -> dict:
@@ -204,9 +263,9 @@ class ToolTesterState(ConnectionState):
     async def call_tool(self, form_data: dict):
         async with self:
             props = self.properties
-            tool_name = self.selected_tool_name
-            self.is_calling = True
-            self.call_error = ""
+            tool_name = self.active_tab  # capture at start for tab safety
+            self.tab_calling[tool_name] = True
+            self.tab_errors[tool_name] = ""
 
         try:
             params: dict[str, Any] = {}
@@ -241,24 +300,24 @@ class ToolTesterState(ConnectionState):
                             params[name] = int(val)
                         except ValueError:
                             async with self:
-                                self.call_error = f"Invalid integer for {name}"
-                                self.is_calling = False
+                                self.tab_errors[tool_name] = f"Invalid integer for {name}"
+                                self.tab_calling[tool_name] = False
                             return
                     elif prop_type == "number":
                         try:
                             params[name] = float(val)
                         except ValueError:
                             async with self:
-                                self.call_error = f"Invalid number for {name}"
-                                self.is_calling = False
+                                self.tab_errors[tool_name] = f"Invalid number for {name}"
+                                self.tab_calling[tool_name] = False
                             return
                     elif prop_type in ("object", "array"):
                         try:
                             params[name] = json.loads(val)
                         except json.JSONDecodeError:
                             async with self:
-                                self.call_error = f"Invalid JSON for {name}"
-                                self.is_calling = False
+                                self.tab_errors[tool_name] = f"Invalid JSON for {name}"
+                                self.tab_calling[tool_name] = False
                             return
                     else:
                         params[name] = val
@@ -267,8 +326,8 @@ class ToolTesterState(ConnectionState):
             missing = [p["name"] for p in props if p["required"] and p["name"] not in params]
             if missing:
                 async with self:
-                    self.call_error = f"Missing required: {', '.join(missing)}"
-                    self.is_calling = False
+                    self.tab_errors[tool_name] = f"Missing required: {', '.join(missing)}"
+                    self.tab_calling[tool_name] = False
                 return
 
             # Get client and call tool
@@ -277,17 +336,19 @@ class ToolTesterState(ConnectionState):
 
             if not client:
                 async with self:
-                    self.call_error = "Not connected to server"
-                    self.is_calling = False
+                    self.tab_errors[tool_name] = "Not connected to server"
+                    self.tab_calling[tool_name] = False
                 return
 
             result = await asyncio.to_thread(client.call_tool, tool_name, params)
 
             async with self:
-                self.call_result = result
-                self.call_params = params
-                self.is_calling = False
+                if tool_name in self.open_tabs:
+                    self.tab_results[tool_name] = result
+                    self.tab_params[tool_name] = params
+                self.tab_calling[tool_name] = False
         except Exception as e:
             async with self:
-                self.call_error = str(e)
-                self.is_calling = False
+                if tool_name in self.open_tabs:
+                    self.tab_errors[tool_name] = str(e)
+                self.tab_calling[tool_name] = False

@@ -3,6 +3,7 @@
 import reflex as rx
 
 from mcp_client.components.sidebar import sidebar
+from mcp_client.components.tab_bar import tab_bar
 from mcp_client.components.tool_form import tool_form
 from mcp_client.components.tool_document import document_view
 from mcp_client.components.result_display import result_display
@@ -25,20 +26,26 @@ def main_content() -> rx.Component:
         rx.cond(
             ViewState.is_document_mode,
             document_view(),
-            # Tester mode
-            rx.cond(
-                ToolTesterState.selected_tool_name == "",
-                rx.callout(
-                    "Select a tool from the sidebar to view details and call it.",
-                    icon="info",
-                    size="2",
+            # Tester mode with tabs
+            rx.vstack(
+                tab_bar(),
+                rx.cond(
+                    ToolTesterState.active_tab == "",
+                    rx.callout(
+                        "Select a tool from the sidebar to view details and call it.",
+                        icon="info",
+                        size="2",
+                    ),
+                    rx.vstack(
+                        tool_form(),
+                        result_display(),
+                        width="100%",
+                        spacing="4",
+                        key=ToolTesterState.selected_tool_name,
+                    ),
                 ),
-                rx.vstack(
-                    tool_form(),
-                    result_display(),
-                    width="100%",
-                    spacing="4",
-                ),
+                width="100%",
+                spacing="0",
             ),
         ),
     )
