@@ -2,8 +2,6 @@
 
 A lightweight web UI for connecting to [MCP](https://modelcontextprotocol.io/) servers, browsing available tools, and calling them interactively.
 
-Built with [Streamlit](https://streamlit.io/).
-
 ## Features
 
 - **Connect** to MCP servers via HTTP/SSE or stdio
